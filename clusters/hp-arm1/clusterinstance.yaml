@@ -1,0 +1,110 @@
+# Ref: https://github.com/stolostron/siteconfig/blob/main/bundle/manifests/siteconfig.open-cluster-management.io_clusterinstances.yaml
+---
+apiVersion: siteconfig.open-cluster-management.io/v1alpha1
+kind: ClusterInstance
+metadata:
+  name: "hp-arm1"
+  namespace: "hp-arm1"
+spec:
+  additionalNTPSources:
+    - "2600:52:7:x::y"
+  baseDomain: "example.lab"
+  clusterImageSetNameRef: "openshift-4.18.3-multi"
+  clusterName: "hp-arm1"
+  clusterNetwork:
+    - cidr: "fd01::/48"
+      hostPrefix: 64
+  cpuPartitioningMode: AllNodes
+  extraLabels:
+    ManagedCluster:
+      common-disconnected: "true"
+      common-418-arch: "arm"
+  holdInstallation: false
+  extraManifestsRefs:
+    - name: ran-rds-manifests
+  installConfigOverrides: |
+    {
+      "capabilities": {
+        "baselineCapabilitySet": "None",
+        "additionalEnabledCapabilities": [
+          "NodeTuning",
+          "OperatorLifecycleManager",
+          "Ingress",
+          "marketplace"
+        ]
+      }
+    }
+  machineNetwork:
+    - cidr: "2600:52:7:97::/64"
+  networkType: "OVNKubernetes"
+  proxy:
+    httpProxy: http://jumphost.example.lab:3128
+    httpsProxy: http://jumphost.example.lab:3128
+    noProxy: .hub.example.lab,9999,5050,6385,8089,6180,6185
+  pullSecretRef:
+    name: "assisted-deployment-pull-secret"
+  serviceNetwork:
+    - cidr: "fd02::/112"
+  sshPublicKey: ""
+  templateRefs:
+    - name: ai-cluster-templates-aarch64-v1
+      namespace: open-cluster-management
+  nodes:
+    - automatedCleaningMode: "disabled"
+      bmcAddress: "redfish-virtualmedia://192.168.x.y/redfish/v1/Systems/1" # -> HP-arm1 /Systems/1/ 
+      bmcCredentialsName:
+        name: "hp-arm1-worker"
+      bootMACAddress: "88:e9:a4:d6:66:cc"
+      bootMode: "UEFI"
+      hostName: "hp-arm1.example.lab"
+      nodeNetwork:
+        interfaces:
+          - name: "enP3p1s0f1np0"
+            macAddress: "88:e9:a4:d6:66:cc"
+        config:
+          interfaces:
+            - name: enP3p1s0f1np0
+              type: ethernet
+              state: up
+              ipv4:
+                address:
+                  - ip: 192.168.x.y
+                    prefix-length: 24
+                enabled: true 
+                dhcp: false
+              ipv6:
+                address:
+                  - ip: 2600:52:7:x::y
+                    prefix-length: 64
+                dhcp: false
+                autoconf: false
+                enabled: true
+            - name: enP3p1s0f1np1
+              type: ethernet
+              state: down
+              ipv4:
+                enabled: false
+                dhcp: false
+              ipv6:
+                dhcp: false
+                autoconf: false
+                enabled: false
+          dns-resolver:
+            config:
+              server:
+                - 2600:52:7:x::y
+                - 192.168.x.y
+          routes:
+            config:
+              - destination: '::/0'
+                next-hop-address: '2600:52:7:x::1'
+                next-hop-interface: enP3p1s0f1np0
+              - destination: '0.0.0.0/0'
+                next-hop-address: '192.168.x.1'
+                next-hop-interface: enP3p1s0f1np0
+      role: "master"
+      rootDeviceHints:
+        deviceName: "/dev/disk/by-path/pci-0007:02:00.0-nvme-1"
+      templateRefs:
+        - name: ai-node-templates-aarch64-v1
+          namespace: open-cluster-management
