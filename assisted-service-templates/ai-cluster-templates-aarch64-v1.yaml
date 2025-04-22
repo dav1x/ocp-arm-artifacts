@@ -1,0 +1,149 @@
+apiVersion: v1
+data:
+  AgentClusterInstall: |-
+    apiVersion: extensions.hive.openshift.io/v1beta1
+    kind: AgentClusterInstall
+    metadata:
+      name: "{{ .Spec.ClusterName }}"
+      namespace: "{{ .Spec.ClusterName }}"
+      annotations:
+    {{ if .SpecialVars.InstallConfigOverrides }}
+        agent-install.openshift.io/install-config-overrides: '{{ .SpecialVars.InstallConfigOverrides }}'
+    {{ end }}
+        siteconfig.open-cluster-management.io/sync-wave: "1"
+    spec:
+      clusterDeploymentRef:
+        name: "{{ .Spec.ClusterName }}"
+      holdInstallation: {{ .Spec.HoldInstallation }}
+      imageSetRef:
+        name: "{{ .Spec.ClusterImageSetNameRef }}"
+    {{ if .Spec.ApiVIPs }}
+      apiVIPs:
+    {{ .Spec.ApiVIPs | toYaml | indent 4 }}
+    {{ end }}
+    {{ if .Spec.IngressVIPs }}
+      ingressVIPs:
+    {{ .Spec.IngressVIPs | toYaml | indent 4 }}
+    {{ end }}
+      networking:
+    {{ if .Spec.ClusterNetwork }}
+        clusterNetwork:
+    {{ .Spec.ClusterNetwork | toYaml | indent 6 }}
+    {{ end }}
+    {{ if .Spec.MachineNetwork }}
+        machineNetwork:
+    {{ .Spec.MachineNetwork | toYaml | indent 6 }}
+    {{ end }}
+    {{ if .Spec.ServiceNetwork }}
+        serviceNetwork:
+    {{ $serviceNetworks := list }}
+    {{ range .Spec.ServiceNetwork }}
+    {{ $serviceNetworks = append $serviceNetworks .CIDR }}
+    {{ end }}
+    {{ $serviceNetworks | toYaml | indent 6 }}
+    {{ end }}
+      provisionRequirements:
+        controlPlaneAgents: {{ .SpecialVars.ControlPlaneAgents }}
+        workerAgents: {{ .SpecialVars.WorkerAgents }}
+    {{ if .Spec.Proxy }}
+      proxy:
+    {{ .Spec.Proxy | toYaml | indent 4 }}
+    {{ end }}
+    {{ if .Spec.PlatformType }}
+      platformType: "{{ .Spec.PlatformType }}"
+    {{ end }}
+      sshPublicKey: "{{ .Spec.SSHPublicKey }}"
+    {{ if gt (len .Spec.ExtraManifestsRefs) 0 }}
+      manifestsConfigMapRefs:
+    {{ .Spec.ExtraManifestsRefs | toYaml | indent 4 }}
+    {{ end }}
+  ClusterDeployment: |-
+    apiVersion: hive.openshift.io/v1
+    kind: ClusterDeployment
+    metadata:
+      name: "{{ .Spec.ClusterName }}"
+      namespace: "{{ .Spec.ClusterName }}"
+      annotations:
+        siteconfig.open-cluster-management.io/sync-wave: "1"
+    spec:
+      baseDomain: "{{ .Spec.BaseDomain }}"
+      clusterInstallRef:
+        group: extensions.hive.openshift.io
+        kind: AgentClusterInstall
+        name: "{{ .Spec.ClusterName }}"
+        version: v1beta1
+      clusterName: "{{ .Spec.ClusterName }}"
+      platform:
+        agentBareMetal:
+          agentSelector:
+            matchLabels:
+              cluster-name: "{{ .Spec.ClusterName }}"
+      pullSecretRef:
+        name: "{{ .Spec.PullSecretRef.Name }}"
+  InfraEnv: |-
+    apiVersion: agent-install.openshift.io/v1beta1
+    kind: InfraEnv
+    metadata:
+      annotations:
+        # oc adm release info --image-for=ironic-agent quay.io/openshift-release-dev/ocp-release:4.18.3-multi
+        infraenv.agent-install.openshift.io/ironic-agent-image-override: "quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:7bab3270ec89403e14b506fe9a73b1e979d1420a6a3b415ed025d4f594d1e095"
+        siteconfig.open-cluster-management.io/sync-wave: "1"
+      name: "{{ .Spec.ClusterName }}"
+      namespace: "{{ .Spec.ClusterName }}"
+    spec:
+      clusterRef:
+        name: "{{ .Spec.ClusterName }}"
+        namespace: "{{ .Spec.ClusterName }}"
+      cpuArchitecture: "aarch64"
+      sshAuthorizedKey: "{{ .Spec.SSHPublicKey }}"
+    {{ if .Spec.Proxy }}
+      proxy:
+    {{ .Spec.Proxy | toYaml | indent 4 }}
+    {{ end }}
+      pullSecretRef:
+        name: "{{ .Spec.PullSecretRef.Name }}"
+      ignitionConfigOverride: '{{ .Spec.IgnitionConfigOverride }}'
+      nmStateConfigLabelSelector:
+        matchLabels:
+          nmstate-label: "{{ .Spec.ClusterName }}"
+      additionalNTPSources:
+    {{ .Spec.AdditionalNTPSources | toYaml | indent 4 }}
+  KlusterletAddonConfig: |-
+    apiVersion: agent.open-cluster-management.io/v1
+    kind: KlusterletAddonConfig
+    metadata:
+      annotations:
+        siteconfig.open-cluster-management.io/sync-wave: "2"
+      name: "{{ .Spec.ClusterName }}"
+      namespace: "{{ .Spec.ClusterName }}"
+    spec:
+      clusterName: "{{ .Spec.ClusterName }}"
+      clusterNamespace: "{{ .Spec.ClusterName }}"
+      applicationManager:
+        enabled: false
+      certPolicyController:
+        enabled: false
+      iamPolicyController:
+        enabled: false
+      policyController:
+        enabled: true
+      searchCollector:
+        enabled: false
+  ManagedCluster: |-
+    apiVersion: cluster.open-cluster-management.io/v1
+    kind: ManagedCluster
+    metadata:
+      name: "{{ .Spec.ClusterName }}"
+      annotations:
+        siteconfig.open-cluster-management.io/sync-wave: "2"
+      labels:
+        cloud: auto-detect
+        vendor: auto-detect
+    spec:
+      hubAcceptsClient: true
+immutable: true
+kind: ConfigMap
+metadata:
+  name: ai-cluster-templates-aarch64-v1
+  namespace: open-cluster-management
+
